@@ -58,6 +58,16 @@ Run it from cron and alert on a non-zero exit:
 */15 * * * * FIM_KEY=... /opt/fim/.venv/bin/fim check -b /root/www.fim.json || mail -s "FIM alert" you@example.com
 ```
 
+## Try it
+
+`demo/run_demo.sh` builds a small web root, takes a signed baseline, simulates a
+defacement plus a web-shell upload, and then shows the signature catching an
+attacker who edits the baseline itself:
+
+```bash
+bash demo/run_demo.sh
+```
+
 ## Security notes
 
 - Keep the baseline **off the monitored host**, or at least on a read-only mount,

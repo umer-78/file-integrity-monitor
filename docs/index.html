@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>fim — File Integrity Monitor Demo</title>
+  <meta name="description" content="Interactive demo of fim: take a SHA-256 baseline of a simulated web root, tamper with files, and verify HMAC-signed baselines in the browser.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%232563eb'/><text x='16' y='23' font-size='16' text-anchor='middle' fill='white' font-family='monospace'>FI</text></svg>">
+  <style>
+    :root {
+      --bg: #f6f7f9; --surface: #ffffff; --surface-2: #eef0f4; --border: #dde1e8;
+      --text: #16181d; --muted: #5d6573; --accent: #2563eb; --accent-ink: #ffffff;
+      --good: #15803d; --bad: #b91c1c; --warn: #d97706;
+      --radius: 12px;
+      --shadow: 0 1px 2px rgb(16 24 40 / 0.06), 0 4px 16px rgb(16 24 40 / 0.05);
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      color-scheme: light;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0e1116; --surface: #161a21; --surface-2: #1d222b; --border: #2a303b;
+        --text: #e8eaee; --muted: #9aa3b2; --accent: #60a5fa; --accent-ink: #0b1220;
+        --good: #4ade80; --bad: #f87171; --warn: #fbbf24;
+        --shadow: none; color-scheme: dark;
+      }
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; }
+    body {
+      font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased;
+    }
+    a { color: var(--accent); }
+    .wrap { max-width: 1000px; margin: 0 auto; padding: 24px 16px 48px; }
+    header.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+    header.top h1 { font-size: 22px; margin: 0; letter-spacing: -0.01em; }
+    header.top p { margin: 2px 0 0; color: var(--muted); }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); min-width: 0; margin-bottom: 16px; }
+    .card h2 { font-size: 15px; margin: 0 0 12px; }
+    .grid { display: grid; gap: 16px; }
+    .grid.two { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+    label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+    input, select, textarea, button { font: inherit; color: inherit; }
+    input, select, textarea {
+      width: 100%; padding: 9px 11px; border-radius: 9px;
+      border: 1px solid var(--border); background: var(--surface-2); outline: none; min-width: 0;
+    }
+    input:focus-visible, textarea:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+    button {
+      cursor: pointer; border: 1px solid var(--border); background: var(--surface-2);
+      padding: 9px 14px; border-radius: 9px; font-weight: 600;
+    }
+    button.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+    button.danger { background: color-mix(in srgb, var(--bad) 12%, var(--surface-2)); border-color: color-mix(in srgb, var(--bad) 35%, var(--border)); color: var(--bad); }
+    .row { display: flex; gap: 10px; align-items: end; flex-wrap: wrap; }
+    .row > * { flex: 1 1 200px; }
+    .row > button { flex: 0 0 auto; }
+    .muted { color: var(--muted); }
+    .mono { font-family: var(--mono); }
+    .filelist { display: grid; gap: 8px; }
+    .file {
+      display: grid; grid-template-columns: 22px 1fr auto; gap: 10px; align-items: center;
+      padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2);
+    }
+    .file.added { border-color: color-mix(in srgb, var(--good) 45%, var(--border)); background: color-mix(in srgb, var(--good) 8%, var(--surface)); }
+    .file.modified { border-color: color-mix(in srgb, var(--warn) 50%, var(--border)); background: color-mix(in srgb, var(--warn) 8%, var(--surface)); }
+    .file.removed { border-color: color-mix(in srgb, var(--bad) 45%, var(--border)); background: color-mix(in srgb, var(--bad) 8%, var(--surface)); opacity: .75; }
+    .file.perms { border-color: color-mix(in srgb, var(--warn) 50%, var(--border)); }
+    .file .name { font-family: var(--mono); font-size: 13px; word-break: break-all; }
+    .file .meta { font-size: 12px; color: var(--muted); font-family: var(--mono); }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+    .badge.ok { background: color-mix(in srgb, var(--good) 15%, transparent); color: var(--good); }
+    .badge.bad { background: color-mix(in srgb, var(--bad) 15%, transparent); color: var(--bad); }
+    .badge.warn { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); }
+    .badge.mut { background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    .result-box {
+      font-family: var(--mono); font-size: 13px; padding: 12px; background: var(--surface-2);
+      border: 1px solid var(--border); border-radius: 8px; margin-top: 10px; white-space: pre-wrap;
+      word-break: break-all; max-height: 260px; overflow: auto;
+    }
+    .finding { padding: 10px 12px; border-radius: 8px; margin: 8px 0; font-size: 14px; }
+    .finding.risk { background: color-mix(in srgb, var(--bad) 10%, transparent); border: 1px solid color-mix(in srgb, var(--bad) 28%, transparent); }
+    .finding.ok { background: color-mix(in srgb, var(--good) 10%, transparent); border: 1px solid color-mix(in srgb, var(--good) 28%, transparent); }
+    .finding .kind { font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--bad); }
+    .finding.ok .kind { color: var(--good); }
+    .finding .detail { margin-top: 3px; color: var(--muted); }
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-top: 12px; }
+    .stat { background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+    .stat .k { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+    .stat .v { font-family: var(--mono); font-size: 18px; font-weight: 700; margin-top: 2px; }
+    .stat .v.bad { color: var(--bad); }
+    .stat .v.good { color: var(--good); }
+    footer { margin-top: 32px; color: var(--muted); font-size: 13px; text-align: center; }
+    code { font-family: var(--mono); font-size: 0.92em; background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
+    .presets { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+    .presets button { font-size: 13px; padding: 5px 10px; font-weight: 500; }
+    .statusline { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <div>
+        <h1>fim — File Integrity Monitor</h1>
+        <p>SHA-256 baseline of a simulated web root, then catch added / modified / removed / permission changes — with HMAC-signed baselines.</p>
+      </div>
+      <a href="https://github.com/umer-78/file-integrity-monitor">Source on GitHub</a>
+    </header>
+
+    <section class="card">
+      <h2>1 · Take a baseline</h2>
+      <p class="muted" style="margin-top:0">The simulated tree mirrors <code>demo/run_demo.sh</code>. Hashing uses the Web Crypto API (<code>crypto.subtle.digest</code>) — real SHA-256 in your browser.</p>
+      <div class="row">
+        <div>
+          <label for="fimKey">FIM_KEY (HMAC-SHA256 signing key)</label>
+          <input id="fimKey" class="mono" value="demo-key-change-me" spellcheck="false" autocomplete="off">
+        </div>
+        <div style="flex:0 0 auto; display:flex; gap:8px; flex-wrap:wrap">
+          <button class="primary" id="initBtn" type="button">fim init</button>
+          <button id="resetBtn" type="button">Reset tree</button>
+        </div>
+      </div>
+      <div class="statusline" id="baselineStatus" aria-live="polite"></div>
+      <div class="result-box" id="baselineOut">No baseline yet. Click "fim init".</div>
+    </section>
+
+    <section class="card">
+      <h2>2 · Current file system</h2>
+      <p class="muted" style="margin-top:0">Mutate the tree the way an attacker would, then run <code>fim check</code>.</p>
+      <div class="filelist" id="fileList"></div>
+      <div class="actions" aria-label="Attack actions">
+        <button class="danger" id="actDeface" type="button">Deface index.html</button>
+        <button class="danger" id="actShell" type="button">Upload web shell</button>
+        <button class="danger" id="actPerms" type="button">Loosen config.php perms</button>
+        <button class="danger" id="actRemove" type="button">Remove robots.txt</button>
+        <button id="actRestore" type="button">Restore tree</button>
+      </div>
+      <div class="presets">
+        <button type="button" id="actEditBaseline">Tamper with baseline hash</button>
+      </div>
+      <p class="muted" style="font-size:13px;margin:8px 0 0">Editing the baseline to hide a change fails the signature check when FIM_KEY is set.</p>
+    </section>
+
+    <section class="card">
+      <h2>3 · fim check</h2>
+      <div class="row">
+        <div style="flex:0 0 auto">
+          <button class="primary" id="checkBtn" type="button">fim check -b www.fim.json</button>
+        </div>
+      </div>
+      <div class="stats" aria-live="polite">
+        <div class="stat"><div class="k">Changes</div><div class="v" id="statChanges">—</div></div>
+        <div class="stat"><div class="k">Signature</div><div class="v" id="statSig">—</div></div>
+        <div class="stat"><div class="k">Exit code</div><div class="v" id="statExit">—</div></div>
+      </div>
+      <div id="checkFindings" style="margin-top:8px"></div>
+      <div class="result-box" id="checkOut">Run a check to see the report.</div>
+    </section>
+
+    <div class="grid two">
+      <section class="card">
+        <h2>What it detects</h2>
+        <ul class="muted" style="margin:0;padding-left:20px">
+          <li><b>added</b> — new file under the root (web shells, uploads)</li>
+          <li><b>modified</b> — SHA-256 of content changed (defacements)</li>
+          <li><b>removed</b> — file present in baseline, missing now</li>
+          <li><b>permissions</b> — mode bits changed, content same</li>
+          <li><b>baseline tamper</b> — HMAC verification fails</li>
+        </ul>
+        <p class="muted" style="margin-bottom:0">Exit codes: <code>0</code> clean, <code>1</code> changes, <code>3</code> baseline error — same as the CLI.</p>
+      </section>
+      <section class="card">
+        <h2>Security notes</h2>
+        <ul class="muted" style="margin:0;padding-left:20px">
+          <li>Keep the baseline off the monitored host (or on a read-only mount).</li>
+          <li>Keep <code>FIM_KEY</code> out of the monitored tree.</li>
+          <li>mtimes are recorded but not compared — they are trivial to fake.</li>
+          <li>Content hashes are what count.</li>
+        </ul>
+        <p class="muted" style="margin-bottom:0">A root-level attacker on the same host can still defeat any local monitor. This is one layer of defence.</p>
+      </section>
+    </div>
+
+    <footer>7 tests · Python 3.10+ · standard library only · Built by <a href="https://github.com/umer-78">Umer Hashmi</a></footer>
+  </div>
+
+  <script>
+    'use strict';
+    // Simulated web root. mode is octal-ish string like Python's oct(): "0o644".
+    const CLEAN = () => ({
+      'index.html': {
+        content: '<h1>Welcome</h1>\n'.repeat(50),
+        mode: '0o644', size: 1500
+      },
+      'config.php': { content: '<?php $db = "app"; ?>\n', mode: '0o640', size: 24 },
+      'robots.txt': { content: 'User-agent: *\nAllow: /\n', mode: '0o644', size: 22 },
+      'uploads/.keep': { content: '', mode: '0o644', size: 0 }
+    });
+
+    let tree = CLEAN();
+    let baseline = null;      // { root, created_at, files: { path: { sha256, size, mode } }, hmac }
+    const subtle = crypto.subtle;
+
+    async function sha256Hex(str) {
+      const data = new TextEncoder().encode(str);
+      const buf = await subtle.digest('SHA-256', data);
+      return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    async function hmacSha256Hex(keyStr, payload) {
+      const key = await subtle.importKey(
+        'raw', new TextEncoder().encode(keyStr),
+        { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+      );
+      const sig = await subtle.sign('HMAC', key, new TextEncoder().encode(payload));
+      return [...new Uint8Array(sig)].map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    // Canonical JSON like Python's json.dumps(sort_keys=True, separators=(",", ":"))
+    function canonicalJson(value) {
+      if (value === null || typeof value !== 'object') return JSON.stringify(value);
+      if (Array.isArray(value)) return '[' + value.map(canonicalJson).join(',') + ']';
+      const keys = Object.keys(value).sort();
+      return '{' + keys.map(k => JSON.stringify(k) + ':' + canonicalJson(value[k])).join(',') + '}';
+    }
+
+    async function scanTree(t) {
+      const files = {};
+      for (const path of Object.keys(t).sort()) {
+        const f = t[path];
+        files[path] = {
+          sha256: await sha256Hex(f.content),
+          size: f.size,
+          mode: f.mode
+        };
+      }
+      return files;
+    }
+
+    async function buildBaseline(key) {
+      const files = await scanTree(tree);
+      const body = {
+        format: 1,
+        root: '/var/www/html',
+        created_at: new Date().toISOString(),
+        files
+      };
+      const payload = canonicalJson(body);
+      const hmac = key ? await hmacSha256Hex(key, payload) : null;
+      return { baseline: body, hmac, payload };
+    }
+
+    async function verifySignature(doc, key) {
+      if (!key) return { ok: true, skipped: true };
+      if (!doc.hmac) return { ok: false, reason: 'no hmac field' };
+      const expect = await hmacSha256Hex(key, canonicalJson(doc.baseline));
+      return { ok: expect === doc.hmac, expect, got: doc.hmac };
+    }
+
+    function compare(baselineFiles, currentFiles) {
+      const changes = [];
+      const oldKeys = Object.keys(baselineFiles);
+      const newKeys = Object.keys(currentFiles);
+      for (const p of oldKeys.filter(k => !newKeys.includes(k)).sort()) {
+        changes.push({ kind: 'removed', path: p, detail: '' });
+      }
+      for (const p of newKeys.filter(k => !oldKeys.includes(k)).sort()) {
+        changes.push({ kind: 'added', path: p, detail: currentFiles[p].size + ' bytes' });
+      }
+      for (const p of oldKeys.filter(k => newKeys.includes(k)).sort()) {
+        const a = baselineFiles[p], b = currentFiles[p];
+        if (a.sha256 !== b.sha256) {
+          changes.push({ kind: 'modified', path: p, detail: `size ${a.size} → ${b.size}` });
+        } else if (a.mode !== b.mode) {
+          changes.push({ kind: 'permissions', path: p, detail: `${a.mode} → ${b.mode}` });
+        }
+      }
+      return changes;
+    }
+
+    const $ = id => document.getElementById(id);
+    const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+    function shortHash(h) { return h.slice(0, 12) + '…'; }
+
+    function renderTree(changesByPath) {
+      const list = $('fileList');
+      const paths = [...new Set([...Object.keys(tree), ...(baseline ? Object.keys(baseline.baseline.files) : [])])].sort();
+      list.innerHTML = paths.map(p => {
+        const inTree = p in tree;
+        const inBase = baseline && p in baseline.baseline.files;
+        let cls = '', badge = '<span class="badge mut">unchanged</span>', meta = '';
+        const ch = changesByPath && changesByPath[p];
+        if (!inBase && inTree) { cls = 'added'; badge = '<span class="badge ok">added</span>'; }
+        else if (inBase && !inTree) { cls = 'removed'; badge = '<span class="badge bad">removed</span>'; }
+        else if (ch && ch.kind === 'modified') { cls = 'modified'; badge = '<span class="badge warn">modified</span>'; }
+        else if (ch && ch.kind === 'permissions') { cls = 'perms'; badge = '<span class="badge warn">perms</span>'; }
+        else if (inBase && inTree) { badge = '<span class="badge ok">ok</span>'; }
+
+        if (inTree) {
+          const f = tree[p];
+          meta = `${f.mode} · ${f.size} bytes`;
+        } else if (inBase) {
+          const b = baseline.baseline.files[p];
+          meta = `deleted · was ${b.mode}, ${b.size} bytes`;
+        }
+        const icon = !inTree ? '✕' : (cls === 'added' ? '+' : (cls === 'modified' || cls === 'perms' ? '~' : '·'));
+        return `<div class="file ${cls}">
+          <span class="mono ${cls === 'removed' ? '' : ''}" aria-hidden="true">${icon}</span>
+          <div><div class="name">${esc(p)}</div><div class="meta">${esc(meta)}</div></div>
+          ${badge}
+        </div>`;
+      }).join('');
+    }
+
+    function renderBaselineStatus(sigOk) {
+      const el = $('baselineStatus');
+      if (!baseline) { el.innerHTML = '<span class="badge mut">no baseline</span>'; return; }
+      if (sigOk === true) el.innerHTML = '<span class="badge ok">baseline signed</span><span class="muted mono" style="font-size:12px">hmac ' + shortHash(baseline.hmac || '') + '</span>';
+      else if (sigOk === false) el.innerHTML = '<span class="badge bad">SIGNATURE INVALID</span>';
+      else el.innerHTML = '<span class="badge mut">baseline present (unsigned key empty)</span>';
+    }
+
+    async function doInit() {
+      const key = $('fimKey').value;
+      baseline = await buildBaseline(key);
+      $('baselineOut').textContent =
+        `Baseline of ${Object.keys(baseline.baseline.files).length} files written to www.fim.json` +
+        (baseline.hmac ? ', signed (HMAC-SHA256).' : ' (no key — unsigned).') +
+        '\n\n' + JSON.stringify(baseline.baseline, null, 2);
+      renderBaselineStatus(key ? true : null);
+      renderTree(null);
+      resetCheck();
+    }
+
+    async function doCheck() {
+      if (!baseline) {
+        $('checkOut').textContent = 'No baseline. Run fim init first.';
+        return;
+      }
+      const key = $('fimKey').value;
+      const sig = await verifySignature(baseline, key);
+      if (!sig.ok) {
+        $('statChanges').textContent = '—';
+        $('statSig').textContent = 'FAIL';
+        $('statSig').className = 'v bad';
+        $('statExit').textContent = '3';
+        $('statExit').className = 'v bad';
+        $('checkFindings').innerHTML =
+          `<div class="finding risk"><span class="kind">baseline error</span>
+           <div class="detail">baseline signature does not match: it was altered or the key is wrong</div></div>`;
+        $('checkOut').textContent =
+          `$ fim check -b www.fim.json\nError: baseline signature does not match.\nexpected ${sig.expect || '?'}\ngot      ${sig.got || baseline.hmac}\nexit 3`;
+        renderBaselineStatus(false);
+        renderTree(null);
+        return;
+      }
+
+      const current = await scanTree(tree);
+      const changes = compare(baseline.baseline.files, current);
+      const byPath = {};
+      for (const c of changes) byPath[c.path] = c;
+
+      $('statChanges').textContent = changes.length;
+      $('statChanges').className = 'v ' + (changes.length ? 'bad' : 'good');
+      $('statSig').textContent = key ? 'OK' : 'n/a';
+      $('statSig').className = 'v good';
+      $('statExit').textContent = changes.length ? '1' : '0';
+      $('statExit').className = 'v ' + (changes.length ? 'bad' : 'good');
+      renderBaselineStatus(key ? true : null);
+      renderTree(byPath);
+
+      const symbols = { added: '+', removed: '✕', modified: '~', permissions: '!' };
+      const names = { added: 'added', removed: 'removed', modified: 'modified', permissions: 'permissions' };
+      if (changes.length === 0) {
+        $('checkFindings').innerHTML =
+          '<div class="finding ok"><span class="kind">clean</span><div class="detail">No changes since the baseline.</div></div>';
+      } else {
+        $('checkFindings').innerHTML = changes.map(c =>
+          `<div class="finding risk"><span class="kind">${esc(names[c.kind])}</span>
+           <div class="detail"><code>${esc(c.path)}</code>${c.detail ? ' — ' + esc(c.detail) : ''}</div></div>`
+        ).join('');
+      }
+
+      const lines = changes.map(c =>
+        `${symbols[c.kind].padEnd(2)} ${names[c.kind].padEnd(13)} ${c.path}${c.detail ? '  ' + c.detail : ''}`
+      );
+      $('checkOut').textContent =
+        `$ fim check -b www.fim.json\n${lines.join('\n') || '(no changes)'}\n${changes.length} change(s).`;
+    }
+
+    function resetCheck() {
+      $('statChanges').textContent = '—';
+      $('statChanges').className = 'v';
+      $('statSig').textContent = '—';
+      $('statSig').className = 'v';
+      $('statExit').textContent = '—';
+      $('statExit').className = 'v';
+      $('checkFindings').innerHTML = '';
+      $('checkOut').textContent = 'Run a check to see the report.';
+    }
+
+    // Attack actions
+    $('actDeface').addEventListener('click', () => {
+      tree['index.html'] = { ...tree['index.html'], content: '<h1>hacked</h1>\n', size: 16 };
+      renderTree(null);
+    });
+    $('actShell').addEventListener('click', () => {
+      tree['uploads/shell.php'] = { content: '<?php system($_GET["c"]); ?>\n', mode: '0o644', size: 29 };
+      renderTree(null);
+    });
+    $('actPerms').addEventListener('click', () => {
+      tree['config.php'] = { ...tree['config.php'], mode: '0o666' };
+      renderTree(null);
+    });
+    $('actRemove').addEventListener('click', () => {
+      delete tree['robots.txt'];
+      renderTree(null);
+    });
+    $('actRestore').addEventListener('click', () => {
+      tree = CLEAN();
+      renderTree(null);
+      resetCheck();
+    });
+    $('actEditBaseline').addEventListener('click', () => {
+      if (!baseline) { $('checkOut').textContent = 'Take a baseline first.'; return; }
+      // Attacker edits a stored hash to hide a modification
+      const first = Object.keys(baseline.baseline.files)[0];
+      baseline.baseline.files[first].sha256 = '0'.repeat(64);
+      baseline.hmac = 'dead'.repeat(16);
+      renderBaselineStatus(null);
+      $('checkOut').textContent = `Tampered with baseline entry for ${first} (sha256 → zeros, hmac rewritten). Run fim check.`;
+    });
+
+    $('initBtn').addEventListener('click', doInit);
+    $('checkBtn').addEventListener('click', doCheck);
+    $('resetBtn').addEventListener('click', async () => {
+      tree = CLEAN();
+      baseline = null;
+      $('baselineOut').textContent = 'No baseline yet. Click "fim init".';
+      renderBaselineStatus(null);
+      renderTree(null);
+      resetCheck();
+    });
+
+    (async () => {
+      renderTree(null);
+      await doInit();
+    })();
+  </script>
+</body>
+</html>

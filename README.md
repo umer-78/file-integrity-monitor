@@ -4,10 +4,10 @@
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-A lightweight host-based file integrity monitor, a small take on what Tripwire
-and AIDE do. Record a **SHA-256 baseline** of a directory, then detect files that
-were **added, removed, modified or had their permissions changed**. Useful for
-spotting web-shell uploads, defacements and configuration drift.
+A lightweight host-based file integrity monitor — my small take on what
+Tripwire and AIDE do. Record a **SHA-256 baseline** of a directory, then catch
+files that were **added, removed, modified or had their permissions changed**.
+Handy for spotting web-shell uploads, defacements and configuration drift.
 
 ```text
 $ export FIM_KEY='a long random secret'

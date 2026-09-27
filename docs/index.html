@@ -626,6 +626,11 @@ html.mk-pre header.top, html.mk-pre main section, html.mk-pre section.card, html
 
     (async () => {
       renderTree(null);
+      if (!subtle) {        // browsers only expose Web Crypto on secure (https or localhost) pages
+        $('baselineOut').textContent = 'Hashing needs the Web Crypto API, which browsers only enable on secure pages. Open this demo over https.';
+        for (const id of ['initBtn', 'checkBtn']) $(id).disabled = true;
+        return;
+      }
       await doInit();
     })();
   </script>

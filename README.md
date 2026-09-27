@@ -3,6 +3,8 @@
 **Live demo:** https://umer-78.github.io/file-integrity-monitor/
 
 [![CI](https://github.com/umer-78/file-integrity-monitor/actions/workflows/ci.yml/badge.svg)](https://github.com/umer-78/file-integrity-monitor/actions/workflows/ci.yml)
+
+[![File Integrity Monitor: the live demo](.github/preview.jpg)](https://umer-78.github.io/file-integrity-monitor/)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 

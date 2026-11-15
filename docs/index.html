@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-scene="security" data-fx-compact="">
+<html lang="en" data-scene="integrity" data-fx-compact="" data-look="spacemono" data-hero="right" data-card="brutal" data-motif="grid" data-backdrop="motes">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -10,8 +10,8 @@
   <meta property="og:url" content="https://umer-78.github.io/file-integrity-monitor/">
   <meta name="twitter:card" content="summary">
   <meta name="description" content="Take a SHA-256 baseline of a simulated web root, tamper with files, and verify HMAC-signed baselines — all in the browser.">
-  <meta name="theme-color" content="#2563eb" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#0a0c10" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#008477" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#041310" media="(prefers-color-scheme: dark)">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%232563eb'/><stop offset='1' stop-color='%237c3aed'/></linearGradient></defs><rect width='32' height='32' rx='8' fill='url(%23g)'/><text x='16' y='22' font-size='14' text-anchor='middle' fill='white' font-family='system-ui' font-weight='bold'>FI</text></svg>">
   <style>
     :root {
@@ -266,7 +266,7 @@ html.mk-pre header.top, html.mk-pre main section, html.mk-pre section.card, html
 <script>(function(){try{if(!(matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)){var r=document.documentElement;r.classList.add('mk-pre');setTimeout(function(){r.classList.remove('mk-pre')},2200)}}catch(e){}})();</script>
 <!-- /motion-kit:head -->
 <!-- fx:v2 -->
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" id="fx-fonts">
 <link rel="stylesheet" href="fx.css">
 <style>:root { --fx-2: #06b6d4; --fx-3: #f59e0b; }</style>
 <!-- /fx:v2 -->
@@ -280,6 +280,11 @@ html.mk-pre header.top, html.mk-pre main section, html.mk-pre section.card, html
 <meta property="og:image:alt" content="fim — File Integrity Monitor Demo: the live demo">
 <meta name="twitter:card" content="summary_large_image">
 <!-- /og -->
+<style id="fx-look">:root[data-look] { --font: 'IBM Plex Sans', system-ui, -apple-system, "Segoe UI", sans-serif; --fx-display: 'Space Mono', system-ui, sans-serif; --mono: 'Space Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; --fx-display-weight: 700; --fx-tracking: -0.03em; --fx-title-case: none; --fx-radius: 0px; --fx-hero-radius: 0px; --fx-control-radius: 0px; --accent: #008477; --accent-hover: #037065; --accent-soft: #ddf9f3; --accent-glow: rgb(0 132 119 / 0.16); --on-accent: #ffffff; --fx-2: #d1557d; --fx-3: #1eb1c9; --bg: #f2fcfa; --bg-elevated: #fafffe; --surface: #fbfffe; --surface-2: #eaf7f4; --surface-3: #e0efec; --border: #d2e2df; --border-strong: #b7c9c5; --line: #d2e2df; }
+@media (prefers-color-scheme: dark) { :root[data-look]:not([data-theme="light"]) { --accent: #14b1a0; --accent-hover: #1dc6b4; --accent-soft: rgb(20 177 160 / 0.14); --accent-glow: rgb(20 177 160 / 0.2); --on-accent: #011613; --fx-2: #f989a9; --fx-3: #2ed3f0; --bg: #041310; --bg-elevated: #0a1917; --surface: #0c1d1a; --surface-2: #142523; --surface-3: #1e2f2c; --border: #253431; --border-strong: #374643; --line: #253431; } }
+:root[data-look][data-theme="dark"] { --accent: #14b1a0; --accent-hover: #1dc6b4; --accent-soft: rgb(20 177 160 / 0.14); --accent-glow: rgb(20 177 160 / 0.2); --on-accent: #011613; --fx-2: #f989a9; --fx-3: #2ed3f0; --bg: #041310; --bg-elevated: #0a1917; --surface: #0c1d1a; --surface-2: #142523; --surface-3: #1e2f2c; --border: #253431; --border-strong: #374643; --line: #253431; }</style>
+<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.min.js" data-fx>
+<link rel="modulepreload" href="fx3d.js" data-fx>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
